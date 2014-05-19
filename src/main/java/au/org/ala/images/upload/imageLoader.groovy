@@ -23,8 +23,44 @@ class imageLoader {
         }
 
         def filename = ""
-        def serviceBaseUrl = "http://images.ala.org.au"
-        // def serviceBaseUrl = "http://devt.ala.org.au:8080/ala-images"
+        // def serviceBaseUrl = "http://images.ala.org.au"
+        def serviceBaseUrl = "http://devt.ala.org.au:8080/ala-images"
+        def threadCount = 4;
+
+        for (int i = 0; i < args.length; ++i) {
+            def arg = args[i]
+            switch (arg) {
+                case "-f":
+                    if (i < args.length - 1) {
+                        i += 1
+                        filename = args[i]
+                    } else {
+                        println "Missing argument for -f (filename)!"
+                    }
+                    break;
+                case "-t":
+                    if (i < args.length - 1) {
+                        i += 1
+                        threadCount = Integer.parseInt(args[i])
+                    } else {
+                        println "Missing argument for -t (thread count)"
+                    }
+                    break;
+                case "-s":
+                    if (i < args.length - 1) {
+                        i += 1
+                        serviceBaseUrl =  args[i]
+                    } else {
+                        println "Missing argument for -s (image service base url)"
+                    }
+
+                    break;
+                case "-?":
+                    usage()
+                    System.exit(0)
+                    break
+            }
+        }
 
         if (args.length == 1) {
             filename = args[0]
@@ -33,17 +69,23 @@ class imageLoader {
         if (filename) {
             def f = new File(filename)
             if (f.exists()) {
-                processFile(f, serviceBaseUrl)
+                println "Using ${threadCount} threads"
+                println "Service base url: ${serviceBaseUrl}"
+
+                processFile(f, serviceBaseUrl, threadCount)
                 System.exit(0)
             }
         }
 
+
         println "Missing or invalid file!"
     }
 
-    private static void processFile(File file, String serviceBaseUrl) {
+    private static void processFile(File file, String serviceBaseUrl, int threadCount) {
 
-        println "Processing file ${file.absolutePath}"
+        def jobDispatcher = new JobDispatcher(threadCount, serviceBaseUrl)
+
+        println "Processing file ${file.absolutePath}..."
 
         def sdf = new SimpleDateFormat("yyyyMMddHHmmss")
         def importBatchId = sdf.format(new Date())
@@ -63,63 +105,25 @@ class imageLoader {
                 metadata.scientificName = fields[5]
                 metadata.importBatchId = importBatchId
 
-                if (!sendUploadRequest(serviceBaseUrl, imageUrl, true, metadata)) {
-                    println "Upload request failed line ${count}"
+                def uploadJob = new UploadJob(imageUrl: imageUrl, metaData: metadata)
+                jobDispatcher.addJob(uploadJob)
+
+                if (++count % 1000 == 0) {
+                    println "${count} urls queued"
                 }
 
-                if (++count % 50 == 0) {
-                    def now = new Date()
-                    def expiredMillis = now.getTime() - startTimeMillis
-                    def ratePerSecond = (count / expiredMillis) * 1000
-                    println "${count} image urls sent (averaging ${ratePerSecond} images per second)"
-                }
             } catch (Exception ex) {
                 println "Error on line ${count}: ${ex.message}"
             }
         }
+
+        jobDispatcher.waitUntilFinished()
+
         def now = new Date()
         def expiredMillis = now.getTime() - startTimeMillis
         def ratePerSecond = (count / expiredMillis) * 1000
         println "Upload complete. ${count} image urls sent (averaging ${ratePerSecond} images per second)"
     }
-
-    private static boolean sendUploadRequest(String serviceBase, String imageUrl, boolean detectDuplicate, Map metadata) {
-        def results = postMultipart("${serviceBase}/ws/uploadImage", imageUrl, detectDuplicate, metadata)
-        return results?.status == 200 && (results.content.success as Boolean)
-    }
-
-    static def postMultipart(url, String imageUrl, boolean detectDuplicate, Map metadata) {
-
-        def result = [:]
-        HTTPBuilder builder = new HTTPBuilder(url)
-        builder.request(Method.POST) { request ->
-
-            requestContentType : 'multipart/form-data'
-            MultipartEntity content = new MultipartEntity(HttpMultipartMode.BROWSER_COMPATIBLE)
-            content.addPart("url", new StringBody(imageUrl))
-            if (detectDuplicate) {
-                content.addPart("detectDuplicate", new StringBody(detectDuplicate.toString()))
-            }
-            def json = new JsonBuilder(metadata).toString()
-            content.addPart("metadata", new StringBody(json))
-
-            request.setEntity(content)
-
-            response.success = {resp, message ->
-                result.status = resp.status
-                result.content = message
-            }
-
-            response.failure = {resp ->
-                result.status = resp.status
-                result.error = "Error POSTing to ${url}"
-            }
-
-        }
-        result
-    }
-
-
 
     private static void usage() {
         println "Usage:"
