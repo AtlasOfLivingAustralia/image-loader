@@ -66,6 +66,13 @@
             <version>2.3</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.hsqldb</groupId>
+            <artifactId>hsqldb</artifactId>
+            <version>2.3.2</version>
+            <scope>runtime</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -117,7 +124,7 @@
                     </descriptorRefs>
                     <archive>
                         <manifest>
-                            <mainClass>au.org.ala.images.upload.imageLoader</mainClass>
+                            <mainClass>au.org.ala.images.upload.ImageLoader</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
