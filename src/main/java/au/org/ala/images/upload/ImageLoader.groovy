@@ -7,28 +7,22 @@ import au.org.ala.images.upload.commands.AbstractCommand
 import au.org.ala.images.upload.commands.CheckStatusCommand
 import au.org.ala.images.upload.commands.CommandArgument
 import au.org.ala.images.upload.commands.CommandArguments
-import au.org.ala.images.upload.commands.LoadDBCommand
+import au.org.ala.images.upload.commands.InitDBCommand
 import au.org.ala.images.upload.commands.StatsCommand
+import au.org.ala.images.upload.commands.UploadCommand
 import au.org.ala.images.upload.service.CSVService
 import au.org.ala.images.upload.service.ImageService
 import au.org.ala.images.upload.service.WebService
-import groovy.json.JsonBuilder
-import groovy.json.JsonSlurper
-import groovyx.net.http.HTTPBuilder
-import groovyx.net.http.Method
-import net.sf.json.JSON
-import org.apache.http.entity.mime.HttpMultipartMode
-import org.apache.http.entity.mime.MultipartEntity
-import org.apache.http.entity.mime.content.StringBody
 
 import java.text.SimpleDateFormat
 
 class ImageLoader {
 
     static {
-        registerCommand(new LoadDBCommand())
+        registerCommand(new InitDBCommand())
         registerCommand(new StatsCommand())
         registerCommand(new CheckStatusCommand())
+        registerCommand(new UploadCommand())
     }
 
     private static Map<String, AbstractCommand> _COMMAND_REGISTRY = [:]

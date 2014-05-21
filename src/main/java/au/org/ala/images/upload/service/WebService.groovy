@@ -17,6 +17,16 @@ class WebService {
         _baseUrl = serviceBaseUrl
     }
 
+    public Map uploadImages(List<Map> images) {
+        def url = "${_baseUrl}/ws/uploadImagesFromUrls"
+        def results = postJSON(url, [images: images])
+        if (results && results.status == 200) {
+            return results.content.results
+        } else {
+            throw new RuntimeException("Upload failed! ${results}")
+        }
+    }
+
     public Map getImageInfo(List images) {
 
         def url = "${_baseUrl}/ws/findImagesByOriginalFilename"

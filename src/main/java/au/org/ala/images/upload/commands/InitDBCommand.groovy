@@ -1,10 +1,10 @@
 package au.org.ala.images.upload.commands
 
-class LoadDBCommand extends AbstractCommand {
+class InitDBCommand extends AbstractCommand {
 
     @Override
     String getCommandName() {
-        return "loaddb"
+        return "initdb"
     }
 
     @Override
@@ -22,7 +22,7 @@ class LoadDBCommand extends AbstractCommand {
 
             batch << [sourceUrl: map.sourceUrl, metadata: map]
             if (lineNumber % 1000 == 0) {
-                println "${lineNumber}. flushing batch"
+                println "${lineNumber} rows added"
                 imageService.insertImages(batch)
                 batch = []
             }

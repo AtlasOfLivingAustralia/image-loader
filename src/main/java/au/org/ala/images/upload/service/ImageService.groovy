@@ -25,7 +25,7 @@ class ImageService {
     public void insertImages(List<Map> imageMaps) {
         _sql.withBatch(0, "INSERT INTO image (sourceUrl, metadata, status) values (?,?,?)") { BatchingPreparedStatementWrapper ps ->
             imageMaps.each { imageMap ->
-                def metadataJson = new JsonBuilder(imageMap).toString()
+                def metadataJson = new JsonBuilder(imageMap.metadata).toString()
                 ps.addBatch(imageMap.sourceUrl, metadataJson, "")
             }
         }
@@ -55,18 +55,16 @@ class ImageService {
     }
 
     public void updateImageStatusBatch(List images) {
-        _sql.withTransaction {
-            def rows = _sql.withBatch(0, "UPDATE image SET status = ? WHERE sourceUrl = ?") { BatchingPreparedStatementWrapper ps ->
-                images.each { image ->
-                    println image.sourceUrl
-                    ps.addBatch(image.sourceUrl, image.status)
+        if (images) {
+            _sql.withTransaction {
+                def rows = _sql.withBatch(0, "UPDATE image SET status = :status WHERE sourceUrl = :sourceUrl") { BatchingPreparedStatementWrapper ps ->
+                    images.each { image ->
+                        ps.addBatch([sourceUrl: image.sourceUrl, status: image.status])
+                    }
                 }
+                _sql.commit()
             }
-            _sql.commit()
-            println rows
         }
-
-        println "${images.size()} statuses updated."
     }
 
     public int countImages() {

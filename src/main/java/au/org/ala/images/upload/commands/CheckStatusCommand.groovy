@@ -9,37 +9,48 @@ class CheckStatusCommand extends AbstractCommand {
 
     @Override
     List<CommandArgument> getAcceptedArgs() {
-        return [CommandArguments.databaseFile, CommandArguments.serviceBaseUrl, CommandArguments.batchSize]
+        return [CommandArguments.databaseFile, CommandArguments.serviceBaseUrl, CommandArguments.statusBatchSize]
     }
 
     @Override
     void executeImpl(Map args) {
-        def batch = []
-        int count = 0
-        int batchSize = args.batchSize;
 
+        int count = 0
+        int batchSize = args.statusBatchSize;
+        int updateTotal = 0
+
+        def updateBatch = { batch ->
+
+            def imageInfo = webService.getImageInfo(batch)
+            batch.each { item ->
+                def status = ""
+                if (imageInfo[item.sourceUrl]) {
+                    status = "OK"
+                }
+                item.status = status
+            }
+            imageService.updateImageStatusBatch(batch)
+        }
+
+        def batch = []
         imageService.eachImageUrl { imageUrl ->
 
             batch << [sourceUrl: imageUrl]
 
             if (++count % batchSize == 0) {
 
-                def imageInfo = webService.getImageInfo(batch)
-                batch.each { item ->
-                    def status = ""
-                    if (imageInfo[item.sourceUrl]) {
-                        status = "OK"
-                    }
-                    item.status = status
-                }
+                updateBatch(batch)
 
-                imageService.updateImageStatusBatch(batch)
                 batch = []
+                updateTotal += batchSize
+                println "${updateTotal} statuses updated."
             }
         }
 
         if (batch) {
-            imageService.updateImageStatusBatch(batch)
+            updateBatch(batch)
+            println "${updateTotal + batch.size()} statuses updated."
         }
+        println "Done."
     }
 }
