@@ -7,8 +7,10 @@ import au.org.ala.images.upload.commands.AbstractCommand
 import au.org.ala.images.upload.commands.CheckStatusCommand
 import au.org.ala.images.upload.commands.CommandArgument
 import au.org.ala.images.upload.commands.CommandArguments
+import au.org.ala.images.upload.commands.DumpCommand
 import au.org.ala.images.upload.commands.InitDBCommand
 import au.org.ala.images.upload.commands.StatsCommand
+import au.org.ala.images.upload.commands.TestURLSCommand
 import au.org.ala.images.upload.commands.UploadCommand
 import au.org.ala.images.upload.service.CSVService
 import au.org.ala.images.upload.service.ImageService
@@ -23,6 +25,8 @@ class ImageLoader {
         registerCommand(new StatsCommand())
         registerCommand(new CheckStatusCommand())
         registerCommand(new UploadCommand())
+        registerCommand(new TestURLSCommand())
+        registerCommand(new DumpCommand())
     }
 
     private static Map<String, AbstractCommand> _COMMAND_REGISTRY = [:]
@@ -99,6 +103,12 @@ class ImageLoader {
             command.webService = webService
 
             command.execute(commandArgs)
+        }
+
+        if (imageService) {
+            print "Shutting down database..."
+            imageService.shutdown()
+            println "OK."
         }
 
     }

@@ -3,7 +3,9 @@ package au.org.ala.images.upload.service
 import groovy.json.JsonBuilder
 import groovyx.net.http.ContentType
 import groovyx.net.http.HTTPBuilder
+import groovyx.net.http.HttpResponseDecorator
 import groovyx.net.http.Method
+import groovyx.net.http.RESTClient
 import net.sf.json.JSON
 import org.apache.http.entity.mime.HttpMultipartMode
 import org.apache.http.entity.mime.MultipartEntity
@@ -49,6 +51,18 @@ class WebService {
             println results
         }
         return null
+    }
+
+    def static getHeadStatus(String url) {
+        // url = URLEncoder.encode(url, "utf-8")
+        RESTClient c = new RESTClient(url)
+        try {
+            HttpResponseDecorator response = c.head(path: '')
+            return response.status
+        } catch (Exception ex) {
+            System.err.println(url)
+            return ex.response?.status ?: 0
+        }
     }
 
     static def postJSON(url, Map params) {

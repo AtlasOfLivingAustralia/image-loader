@@ -21,13 +21,17 @@ class CheckStatusCommand extends AbstractCommand {
 
         def updateBatch = { batch ->
 
-            def imageInfo = webService.getImageInfo(batch)
+            def imageInfoList = webService.getImageInfo(batch)
             batch.each { item ->
                 def status = ""
-                if (imageInfo[item.sourceUrl]) {
+                def imageId = ""
+                def imageData = imageInfoList[item.sourceUrl]
+                if (imageData && imageData.imageId) {
                     status = "OK"
+                    imageId = imageData.imageId
                 }
                 item.status = status
+                item.imageId = imageId
             }
             imageService.updateImageStatusBatch(batch)
         }

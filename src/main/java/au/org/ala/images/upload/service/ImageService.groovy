@@ -5,6 +5,8 @@ import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 
+import java.sql.ResultSet
+
 class ImageService {
 
     Sql _sql
@@ -15,9 +17,20 @@ class ImageService {
         println "OK"
     }
 
+    public void shutdown() {
+        _sql.execute("SHUTDOWN")
+    }
+
+    public void dumpImageTable() {
+        def count = 0;
+        _sql.eachRow("select * from image") { row ->
+            println row
+        }
+    }
+
     public void initializeDatabase(String[] columnHeaders) {
         _sql.execute("drop table image if exists;");
-        _sql.execute("create table image (id BIGINT IDENTITY, sourceUrl varchar(255), metadata varchar(4096), status VARCHAR(25))")
+        _sql.execute("create table image (id BIGINT IDENTITY, sourceUrl varchar(255), metadata varchar(4096), status VARCHAR(25), imageIdentifier VARCHAR(50))")
 
         _sql.execute("CREATE INDEX url_idx ON image (sourceUrl);")
     }
@@ -50,20 +63,14 @@ class ImageService {
         }
     }
 
-    public void setImageStatus(String url, String status) {
-        _sql.executeUpdate("UPDATE image SET status=? WHERE sourceUrl = ?", [status, url])
-    }
-
     public void updateImageStatusBatch(List images) {
         if (images) {
-            _sql.withTransaction {
-                def rows = _sql.withBatch(0, "UPDATE image SET status = :status WHERE sourceUrl = :sourceUrl") { BatchingPreparedStatementWrapper ps ->
-                    images.each { image ->
-                        ps.addBatch([sourceUrl: image.sourceUrl, status: image.status])
-                    }
+            def rows = _sql.withBatch(0, "UPDATE image SET status = :status, imageIdentifier = :imageId WHERE sourceUrl = :sourceUrl") { BatchingPreparedStatementWrapper ps ->
+                images.each { image ->
+                    ps.addBatch([sourceUrl: image.sourceUrl, status: image.status, imageId: image.imageId ?: ''])
                 }
-                _sql.commit()
             }
+            _sql.commit()
         }
     }
 
