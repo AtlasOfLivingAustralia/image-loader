@@ -1,5 +1,9 @@
 package au.org.ala.images.upload.commands
 
+import au.org.ala.images.upload.UploadJob
+import au.org.ala.images.upload.service.ImageService
+import au.org.ala.images.upload.service.WebService
+
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -23,58 +27,51 @@ class UploadCommand extends AbstractCommand {
         def threadCount = args.threadCount.toInteger()
         def threadPool = Executors.newFixedThreadPool(threadCount);
 
-        def uploadBatch = { batch ->
-
-            def results = webService.uploadImages(batch)
-            def statusBatch = []
-            batch.each { srcImage ->
-                def item = [sourceUrl: srcImage.sourceUrl, status: ""]
-                if (results[srcImage.sourceUrl].success) {
-                    item.status = "OK"
-                    item.imageId = results[srcImage.sourceUrl].imageId
-                }
-                statusBatch << item
-            }
-            imageService.updateImageStatusBatch(statusBatch)
-
-        }
-
         int batchSize = args.uploadBatchSize.toInteger()
         def batch = []
         int limit = args.limit.toInteger()
-        AtomicInteger imagesUploaded = new AtomicInteger(0)
+
+        AtomicInteger batchId = new AtomicInteger(0)
+
+        def context = new UploadJobContext(webService: webService, imageService: imageService)
 
         imageService.eachImage { srcImage ->
 
             if (limit == 0 || count.get() < limit) {
 
                 if (srcImage.status != 'OK') {
+                    def index = count.incrementAndGet()
+                    srcImage.metaData.batchSequenceNumber = index
                     batch << srcImage.metaData
-                    count.incrementAndGet()
                 }
 
                 if (batch.size() == batchSize) {
-                    threadPool.submit {
-                        uploadBatch(batch)
-                        imagesUploaded.addAndGet(batchSize)
-                        println "${imagesUploaded} images uploaded."
-                    }
+                    batchId.incrementAndGet()
+                    threadPool.submit(new UploadJob(batchId.get(), batch, context))
                     batch = []
                 }
             }
         }
 
         if (batch) {
-            threadPool.submit {
-                uploadBatch(batch)
-                println "${count} images uploaded."
-            }
+            batchId.incrementAndGet()
+            threadPool.submit(new UploadJob(batchId.get(), batch, context))
         }
 
         threadPool.shutdown()
         threadPool.awaitTermination(10, TimeUnit.DAYS)
 
-        println "Done."
+        println "Done. ${context.uploadCount.get()} uploaded with ${context.errorCount.get()} errors."
     }
 }
+
+public class UploadJobContext {
+
+    AtomicInteger uploadCount = new AtomicInteger(0)
+    AtomicInteger errorCount = new AtomicInteger(0)
+    WebService webService
+    ImageService imageService
+
+}
+
 
