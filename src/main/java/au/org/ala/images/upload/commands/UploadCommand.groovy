@@ -4,6 +4,7 @@ import au.org.ala.images.upload.UploadJob
 import au.org.ala.images.upload.service.ImageService
 import au.org.ala.images.upload.service.WebService
 
+import java.text.SimpleDateFormat
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -31,9 +32,12 @@ class UploadCommand extends AbstractCommand {
         def batch = []
         int limit = args.limit.toInteger()
 
+        def sdf = new SimpleDateFormat("yyyyMMddHHmmss")
+        def importBatchId = sdf.format(new Date())
+
         AtomicInteger batchId = new AtomicInteger(0)
 
-        def context = new UploadJobContext(webService: webService, imageService: imageService)
+        def context = new UploadJobContext(webService: webService, imageService: imageService, importBatchId: importBatchId)
 
         imageService.eachImage { srcImage ->
 
@@ -42,6 +46,7 @@ class UploadCommand extends AbstractCommand {
                 if (srcImage.status != 'OK') {
                     def index = count.incrementAndGet()
                     srcImage.metaData.batchSequenceNumber = index
+                    srcImage.metaData.importBatchId = importBatchId
                     batch << srcImage.metaData
                 }
 
@@ -71,6 +76,7 @@ public class UploadJobContext {
     AtomicInteger errorCount = new AtomicInteger(0)
     WebService webService
     ImageService imageService
+    String importBatchId
 
 }
 

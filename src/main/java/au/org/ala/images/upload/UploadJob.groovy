@@ -1,9 +1,6 @@
 package au.org.ala.images.upload
 
 import au.org.ala.images.upload.commands.UploadJobContext
-import au.org.ala.images.upload.service.ImageService
-import au.org.ala.images.upload.service.WebService
-
 
 class UploadJob implements Runnable {
 
