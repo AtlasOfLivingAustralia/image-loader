@@ -1,5 +1,12 @@
 package au.org.ala.images.upload.commands
 
+import au.org.ala.images.upload.service.ImageService
+import au.org.ala.images.upload.service.WebService
+
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+
 class CheckStatusCommand extends AbstractCommand {
 
     @Override
@@ -9,20 +16,64 @@ class CheckStatusCommand extends AbstractCommand {
 
     @Override
     List<CommandArgument> getAcceptedArgs() {
-        return [CommandArguments.databaseFile, CommandArguments.serviceBaseUrl, CommandArguments.statusBatchSize]
+        return [CommandArguments.databaseFile, CommandArguments.serviceBaseUrl, CommandArguments.statusBatchSize, CommandArguments.threadCount]
     }
 
     @Override
     void executeImpl(Map args) {
 
         int count = 0
-        int batchSize = args.statusBatchSize;
-        int updateTotal = 0
+        int batchSize = args.statusBatchSize.toInteger();
+        def threadCount = args.threadCount.toInteger();
 
-        def updateBatch = { batch ->
+        def threadPool = Executors.newFixedThreadPool(threadCount);
 
-            def imageInfoList = webService.getImageInfo(batch)
-            batch.each { item ->
+        def batch = []
+        def context = new UpdateStatusJobContext(webService: webService, imageService: imageService)
+        imageService.eachImageUrl { imageUrl ->
+
+            batch << [sourceUrl: imageUrl]
+
+            if (++count % batchSize == 0) {
+                threadPool.submit(new UpdateStatusJob(batch, context))
+                batch = []
+            }
+        }
+
+        if (batch) {
+            threadPool.submit(new UpdateStatusJob(batch, context))
+        }
+
+        threadPool.shutdown()
+        threadPool.awaitTermination(3, TimeUnit.DAYS)
+        println "Done. ${context.count} Statuses updated."
+    }
+}
+
+public class UpdateStatusJobContext {
+
+    AtomicInteger count = new AtomicInteger(0)
+    WebService webService
+    ImageService imageService
+
+}
+
+
+class UpdateStatusJob implements Runnable {
+
+    private List _batch
+    private UpdateStatusJobContext _context
+
+    public UpdateStatusJob(List batch, UpdateStatusJobContext context) {
+        _batch = batch
+        _context = context
+    }
+
+    @Override
+    void run() {
+        try {
+            def imageInfoList = _context.webService.getImageInfo(_batch)
+            _batch.each { item ->
                 def status = ""
                 def imageId = ""
                 def imageData = imageInfoList[item.sourceUrl]
@@ -33,28 +84,13 @@ class CheckStatusCommand extends AbstractCommand {
                 item.status = status
                 item.imageId = imageId
             }
-            imageService.updateImageStatusBatch(batch)
+            _context.imageService.updateImageStatusBatch(_batch)
+            _context.count.addAndGet(_batch.size())
+            println("${_context.count.get()} statuses updated.")
+        } catch (Exception ex) {
+            ex.printStackTrace()
+            throw ex
         }
-
-        def batch = []
-        imageService.eachImageUrl { imageUrl ->
-
-            batch << [sourceUrl: imageUrl]
-
-            if (++count % batchSize == 0) {
-
-                updateBatch(batch)
-
-                batch = []
-                updateTotal += batchSize
-                println "${updateTotal} statuses updated."
-            }
-        }
-
-        if (batch) {
-            updateBatch(batch)
-            println "${updateTotal + batch.size()} statuses updated."
-        }
-        println "Done."
     }
+
 }

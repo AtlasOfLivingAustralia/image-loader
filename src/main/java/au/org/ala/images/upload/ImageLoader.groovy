@@ -185,8 +185,22 @@ class ImageLoader {
         println "Usage:"
         println "au.org.ala.images.upload.imageLoader <command> [<args>]"
         println "  where <command> is one of:"
-        _COMMAND_REGISTRY.each { kvp ->
+        List<CommandArgument> allArgs = []
+        _COMMAND_REGISTRY.values().each { cmd ->
+            print "    ${cmd.commandName}\t"
+            def args = []
+            cmd.getAcceptedArgs().each { arg ->
+                if (!allArgs.contains(arg)) {
+                    allArgs << arg
+                }
+                args << "[${arg.switch} <${arg.name}>]"
+            }
+            println args.join(" ")
+        }
 
+        println "  Arguments: "
+        allArgs.each { arg ->
+            println "    ${arg.name}\t\t${arg.description} (defaults to ${arg.defaultValue})"
         }
     }
 }
